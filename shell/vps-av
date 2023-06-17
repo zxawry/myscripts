@@ -1,0 +1,52 @@
+#! /bin/sh
+
+stock_check() {
+	URL=$1
+
+	# Number of available servers is indicated on three lines as follows:
+	# -------------------------------------------------------------------
+	#<div class="package-qty">
+        #	5 Available
+        #</div>
+	# -------------------------------------------------------------------
+	# The first `awk` call will output the above three-lined matches.
+	# Next, the second line matching only available quantity is `grep`ed.
+	# Finally, `awk` will output `1` if any servers are available.
+
+	curl -s $URL |
+	awk '/<div class="package-qty">/, /<\/div>/' |
+	grep -i -o -- "-*[0-9]* Available" |
+	awk 'BEGIN {F=1} {if ($1 > 0) F=0} END {exit F}'
+
+	return $?
+}
+
+if [ $# -ne 1 ]
+then
+	echo "USAGE: vps-av <product_id>"
+	echo "You must pass a product ID from the list below:"
+	echo "\tLas Vegas - AMD RYZEN KVM: 37"
+	echo "\tNew York - AMD RYZEN KVM: 38"
+	echo "\tMiami - AMD RYZEN KVM: 48"
+	echo "\tLuxembourg - AMD RYZEN KVM: 39"
+	exit 1
+fi
+
+while :
+do
+	LST="https://my.frantech.ca/cart.php?gid=$1"
+
+	stock_check $LST
+
+	if [ $? -eq 0 ]
+	then
+		echo "$(date -u): Found available stocks."
+	elif [ $? -eq 1 ]
+	then
+		echo "$(date -u): No available stocks."
+	else # Error
+		echo "$(date -u): Some error occured."
+	fi
+
+	sleep 900 # wait for 15 minutes
+done

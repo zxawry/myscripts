@@ -1,0 +1,111 @@
+#! /bin/sh
+
+# Desc: This is a utility tool for viewing logs of `ii`, the minimal IRC client by suckless-tools.
+# By default logs are stored at `$HOME/.irc` similar to the following directory hierarchy:
+# 	./
+# 	| -- server_1/
+# 	|   | -- /channel_11
+# 	|   | -- /channel_12
+# 	|   ` -- /channel_13
+# 	| -- server_2/ 
+# 	|   | -- /channel_21
+# 	|   | -- /channel_22
+# 	|   ` -- /channel_23
+# 	` -- server_2/ 
+# 	    | -- /channel_31
+# 	    | -- /channel_32
+# 	    ` -- /channel_33
+# For the start, using `iictl run` in a multiplexer like `tmux` or `screen` will keep the client running in the background.
+# Viewing all the logs is as simple as `iictl list`, channel logs will be opened recursively for viewing one after another.
+# To view only one specific channel log, one can use `iictl view <server_name> <channel_name>`.
+
+IRC_ADDR="irc.libera.chat"
+IRC_PORT=6667
+IRC_DIR=$HOME/.irc
+IRC_NAME="replace_with_your_name"
+IRC_REALNAME="replace_with_your_realname"
+
+help() {
+	echo "USAGE: iictl <cmd> <params>"
+}
+
+run() {
+	while true
+	do
+		# `irc_auto_join.sh` is an auxilary shell script file for:
+		# 	- waiting for `ii` to connect to the IRC server.
+		# 	- automating user identification.
+		# 	- joining the given channels automatically.
+		# sample content:
+		# --------------------------------------------------------------------
+		# IRC_DIR=$HOME/.irc
+		#
+		# while [ ! -e $IRC_DIR/irc.libera.chat/nickserv/in ]
+		# do
+		# 	sleep 1
+		# done
+		# 
+		# echo "identify yourpasswordhere" > $IRC_DIR/irc.libera.chat/nickserv/in
+		# 
+		# while [ ! -e $IRC_DIR/irc.libera.chat/in ]
+		# do
+		# 	sleep 1
+		# done
+		# 
+		# echo "/j #linux" > $IRC_DIR/irc.libera.chat/in
+		# echo "/j #debian" > $IRC_DIR/irc.libera.chat/in
+		# echo "/j #freebsd" > $IRC_DIR/irc.libera.chat/in
+		# echo "/j #openbsd" > $IRC_DIR/irc.libera.chat/in
+		# -------------------------------------------------------------------
+		. irc_auto_join.sh &
+		ii -s $IRC_ADDR -p $IRC_PORT -i $IRC_DIR -n $IRC_NAME -f $IRC_REALNAME
+	done
+}
+
+list() {
+	for SERVER in $(ls "$IRC_DIR")
+	do
+		echo "$SERVER:"
+		CHANNELS=$(ls "$IRC_DIR/$SERVER" | grep "^#")
+		for CHANNEL in $CHANNELS
+		do
+			echo "\t$CHANNEL"
+			sleep 0.2
+			grep -v "^[0-9]* -!-" "$IRC_DIR/$SERVER/$CHANNEL/out" | less +G
+		done
+	done
+}
+
+view() {
+	SERVER="$IRC_DIR/$1"
+	if [ ! -d $SERVER ]
+	then
+		echo "ERROR: $1 is not a known server."
+		exit 1
+	fi
+
+	CHANNEL="$SERVER/#$2"
+	if [ ! -d $CHANNEL ]
+	then
+		echo "ERROR: $2 is not a known channel."
+		exit 1
+	fi
+
+	grep -v "^[0-9]* -!-" "$CHANNEL/out" | less +G
+}
+
+case $1 in
+	view)
+		view $2 $3
+		;;
+	list)
+		list
+		;;
+	run)
+		run
+		;;
+	help | *)
+		help
+		;;
+esac
+

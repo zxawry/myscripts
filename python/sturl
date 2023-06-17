@@ -1,0 +1,52 @@
+#! /usr/bin/python3
+
+import sys
+import requests
+from html.parser import HTMLParser
+ 
+class Parser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.found_title = False
+        self.print_title = True
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "title":
+            self.found_title = True
+ 
+    def handle_data(self, data):
+        if self.found_title and self.print_title:
+            data = data.split()
+            for item in data:
+                item = item.strip()
+            print(' '.join(data))
+            # set this flag for repeated title tags
+            self.print_title = False
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self.found_title = False
+
+DEFAULT_SOCKS5 = "socks5h://localhost:1080"
+
+url = None
+proxies = None
+parser = Parser()
+
+if len(sys.argv) == 2:
+    url = sys.argv[1]
+elif len(sys.argv) == 3 and sys.argv[1] == '-x':
+    url = sys.argv[2]
+    proxies = { "http": DEFAULT_SOCKS5, "https": DEFAULT_SOCKS5 }
+else:
+    print("USAGE: sturl [-x] url")
+    print("       -x \t use default socks5 proxy to fetch url")
+    sys.exit()
+
+try:
+    response = requests.get(url, proxies=proxies)
+    parser.feed(response.text)
+    print(url)
+except:
+    print("ERROR: failed to fetch and parse: {}".format(url), file=sys.stderr)

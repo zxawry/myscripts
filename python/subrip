@@ -1,0 +1,46 @@
+#! /usr/bin/python3
+
+import sys
+import fileinput
+
+# Timestamps format
+#HH:MM:SS,mmm --> HH:MM:SS,mmm
+
+def get_msec(ts):
+    ts = ts.replace(',', '')
+    tv = ts.split(':')
+    msec = int(tv[2])                   # miliseconds
+    msec += int(tv[1]) * 60 * 1000      # minutes
+    msec += int(tv[0]) * 3600 * 1000    # hours
+    return msec
+
+def get_ts(msec):
+    hour = int(msec / (3600 * 1000))
+    msec = msec % (3600 * 1000)
+    minute = int(msec / (60 * 1000))
+    msec = msec % (60 * 1000)
+    second = int(msec / 1000)
+    msec = msec % 1000
+    return '{:02d}:{:02d}:{:02},{:03d}'.format(hour, minute, second, msec)
+
+def calc_ts(ts, ofst):
+    msec = get_msec(ts)
+    msec += ofst
+    ts = get_ts(msec)
+    return ts
+
+if len(sys.argv) < 3:
+    print('USAGE: convert srt_file diff_msec')
+    sys.exit()
+
+subrip = sys.argv[1]
+offset = int(sys.argv[2])
+
+for line in fileinput.input(files=[subrip]):
+    bare_line = line.strip()
+    timestamps = bare_line.split(' --> ')
+    if len(timestamps) == 2:
+        timestamps[0] = calc_ts(timestamps[0], offset)
+        timestamps[1] = calc_ts(timestamps[1], offset)
+        bare_line = '{} --> {}'.format(timestamps[0], timestamps[1])
+    print(bare_line)

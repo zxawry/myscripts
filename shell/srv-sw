@@ -1,0 +1,85 @@
+#! /bin/sh
+
+TOR_BRIDGE_PORT="$YOUR_TOR_BRIDGE_PORT/tcp"
+TOR_BRIDGE_COMMENT="tor bridge access"
+TOR_OBFS4_PORT="$YOUR_TOR_OBFS4_PORT/tcp"
+TOR_OBFS4_COMMENT="tor obfs4 access"
+
+I2P_INBOUND_PORT="9901"
+I2P_INBOUND_COMMENT="i2p inbound access"
+
+UFW_ALLOW_RULE=1
+UFW_BLOCK_RULE=2
+
+ufw_update() {
+	PORT=$1
+	COMMENT=$2
+	ACTION=$3
+	
+	if ufw status | grep -q "^$PORT"
+	then
+		echo "$COMMENT is allowed."
+		if [ $ACTION -eq $UFW_BLOCK_RULE ]
+		then
+			ufw delete allow $PORT comment "$COMMENT"
+		fi
+	else
+		echo "$COMMENT is blocked."
+		if [ $ACTION -eq $UFW_ALLOW_RULE ]
+		then
+			ufw allow $PORT comment "$COMMENT"
+		fi
+	fi
+
+	ufw reload
+}
+
+tor_start() {
+	# allow access to ports
+	ufw_update "$TOR_BRIDGE_PORT" "$TOR_BRIDGE_COMMENT" "$UFW_ALLOW_RULE"
+	ufw_update "$TOR_OBFS4_PORT" "$TOR_OBFS4_COMMENT" "$UFW_ALLOW_RULE"
+
+	systemctl start tor.service
+}
+
+tor_stop() {
+	systemctl stop tor.service
+
+	# block access to ports
+	ufw_update "$TOR_BRIDGE_PORT" "$TOR_BRIDGE_COMMENT" "$UFW_BLOCK_RULE"
+	ufw_update "$TOR_OBFS4_PORT" "$TOR_OBFS4_COMMENT" "$UFW_BLOCK_RULE"
+}
+
+i2p_start() {
+	# allow access to port
+	ufw_update "$I2P_INBOUND_PORT" "$I2P_INBOUND_COMMENT" "$UFW_ALLOW_RULE"
+
+	systemctl start i2p.service
+}
+
+
+i2p_stop() {
+	systemctl stop i2p.service
+
+	# block access to port
+	ufw_update "$I2P_INBOUND_PORT" "$I2P_INBOUND_COMMENT" "$UFW_BLOCK_RULE"
+}
+
+srv_switch() {
+	if pgrep -u "debian-tor" > /dev/null
+	then
+		echo "tor is running"
+		tor_stop
+		i2p_start
+	elif pgrep -u "i2psvc" > /dev/null
+	then
+		echo "i2p is running"
+		i2p_stop
+		tor_start
+	else
+		echo "no running service"
+	fi
+
+}
+
+srv_switch
